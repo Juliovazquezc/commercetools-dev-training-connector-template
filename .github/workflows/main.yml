@@ -1,0 +1,40 @@
+name: Auto Merge dev into QA with "ours" strategy
+
+on:
+  schedule:
+    - cron: '0 13 * * 1-5' # Runs at 7:00 AM (MX) Monday through Friday
+  workflow_dispatch: # Allows manual execution as well
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Needed to access full Git history
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create merge branch from devdelopment
+        run: |
+          DATE=$(date +'%Y%m%d')
+          TODAY=$(date +'%Y-%m-%d')
+          BRANCH_NAME="auto-merge-dev-to-qa-$DATE"
+          git checkout origin/development -b $BRANCH_NAME
+          git merge -s ours origin/qa -m "Daily QA merge - $TODAY"
+          git push origin $BRANCH_NAME
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "Daily QA Merge - ${{ env.BRANCH_NAME }}"
+          body: "Daily QA Merge"
+          base: qa
+          head: ${{ env.BRANCH_NAME }}
